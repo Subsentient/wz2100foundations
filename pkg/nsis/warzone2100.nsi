@@ -173,10 +173,6 @@ Section $(TEXT_SecBase) SecBase
   ; Main executable
   File "${TOP_BUILDDIR}\src\${PACKAGE}.exe"
 
-  ; Windows dbghelp library
-  File "${EXTDIR}\bin\dbghelp.dll.license.txt"
-  File "${EXTDIR}\bin\dbghelp.dll"
-
 !ifdef PORTABLE
 ; openAL installer
   File "${EXTDIR}\bin\oalinst.exe"
@@ -241,9 +237,9 @@ Section $(TEXT_SecBase) SecBase
   File "${TOP_SRCDIR}\data\music\music.wpl"
 
   SetOutPath "$INSTDIR\fonts"
-  File "/oname=fonts.conf" "${EXTDIR}\etc\fonts\fonts.conf.wd_disable"
-  File "${EXTDIR}\etc\fonts\DejaVuSans.ttf"
-  File "${EXTDIR}\etc\fonts\DejaVuSans-Bold.ttf"
+  File "${TOP_SRCDIR}\win32\fonts\fonts.conf"
+  File "${TOP_SRCDIR}\win32\fonts\DejaVuSans.ttf"
+  File "${TOP_SRCDIR}\win32\fonts\DejaVuSans-Bold.ttf"
 
 !ifndef PORTABLE
   ;Store installation folder
