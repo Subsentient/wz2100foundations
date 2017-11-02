@@ -222,11 +222,6 @@ Section $(TEXT_SecBase) SecBase
   Push "Readme.en"
   Push "Readme.en.txt"
   Call unix2dos
-  File "${TOP_SRCDIR}\doc\quickstartguide.html"
-  File "${TOP_SRCDIR}\doc\quickstartguide.pdf"
-  File "${TOP_SRCDIR}\doc\docbook-xsl.css"
-  SetOutPath "$INSTDIR\doc\images"
-  File "${TOP_SRCDIR}\doc\images\*.*"
 
   ; Music files
   SetOutPath "$INSTDIR\music"
