@@ -16,6 +16,7 @@ AC_CONFIG_SRCDIR([lib/framework/frame.cpp])
 CFLAGS="${CFLAGS}"
 CXXFLAGS="${CXXFLAGS}"
 
+WZ_CXXFLAGS="${WZ_CXXFLAGS} -std=gnu++11"
 
 # Make cross compilation options available in --help
 AC_CANONICAL_HOST
@@ -261,12 +262,7 @@ AC_ARG_ENABLE([debug],
 AC_MSG_CHECKING([whether to compile in debug mode])
 AC_MSG_RESULT([${enable_debug}])
 
-# gcc 4.5 added some warnings to -Wall that weren't even valid in previous
-# versions. The -Werror is necessary since otherwise gcc prints a warning that
-# the option is only valid for c++/objc++, but the test succeeds. The order is
-# also important, it doesn't work if -Werror comes last.
-AX_C_CHECK_FLAG([-Werror -Wno-switch], , , CFLAGS_IGNORE_WARNINGS="${CFLAGS_IGNORE_WARNINGS} -Wno-switch")
-AX_C_CHECK_FLAG([-Werror -Wno-enum-compare], , , CFLAGS_IGNORE_WARNINGS="${CFLAGS_IGNORE_WARNINGS} -Wno-enum-compare")
+
 # Only needed for CXX, actually.
 WZ_CPPFLAGS="${WZ_CPPFLAGS} -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS"
 
@@ -281,23 +277,23 @@ else
 	WZ_Wno_="-Wno-"
 fi
 
-WZ_WARNINGS_GCC="-Wall -Wextra ${WZ_Wno_}unused-parameter ${WZ_Wno_}sign-compare -Wcast-align -Wwrite-strings -Wpointer-arith ${WZ_Wno_}format-security"
+WZ_WARNINGS_GCC="-Wall -Wextra -Wno-unused-parameter -Wno-sign-compare -Wcast-align -Wwrite-strings -Wpointer-arith -Wno-format-security"
 WZ_WARNINGS_GCC_C="${WZ_WARNINGS_GCC} -Wstrict-prototypes -Wdeclaration-after-statement ${CFLAGS_IGNORE_WARNINGS}"
-WZ_WARNINGS_GCC_CXX="${WZ_Wno_}enum-compare ${WZ_WARNINGS_GCC}"
+WZ_WARNINGS_GCC_CXX="-Wno-enum-compare ${WZ_WARNINGS_GCC}"
 if test "x$enable_debug" = "xyes" ; then
 	if test "x$cc_icc" = "xyes" ; then
-		WZ_CFLAGS="${WZ_CFLAGS} -O0 -g -Wcheck -Werror"
-		WZ_CXXFLAGS="${WZ_CXXFLAGS} -O0 -g -Wcheck -Werror"
+		WZ_CFLAGS="${WZ_CFLAGS} -O0 -g -Wcheck"
+		WZ_CXXFLAGS="${WZ_CXXFLAGS} -O0 -g -Wcheck"
 		WZ_CPPFLAGS="${WZ_CPPFLAGS} -DDEBUG"
 	else
-		WZ_CFLAGS="${WZ_CFLAGS} -O0 -g -Werror ${WZ_WARNINGS_GCC_C}"
-		WZ_CXXFLAGS="${WZ_CXXFLAGS} -O0 -g -Werror ${WZ_WARNINGS_GCC_CXX}"
+		WZ_CFLAGS="${WZ_CFLAGS} -O0 -g ${WZ_WARNINGS_GCC_C}"
+		WZ_CXXFLAGS="${WZ_CXXFLAGS} -O0 -g ${WZ_WARNINGS_GCC_CXX}"
 		WZ_C99FLAGS="${WZ_C99FLAGS} -Wno-declaration-after-statement"
 		WZ_CPPFLAGS="${WZ_CPPFLAGS} -DDEBUG"
 	fi
 elif test "x$enable_debug" = "xoptimised" ; then
-	WZ_CFLAGS="${WZ_CFLAGS} -O2 -g -Werror ${WZ_WARNINGS_GCC_C}"
-	WZ_CXXFLAGS="${WZ_CXXFLAGS} -O2 -g -Werror ${WZ_WARNINGS_GCC_CXX}"
+	WZ_CFLAGS="${WZ_CFLAGS} -O2 -g ${WZ_WARNINGS_GCC_C}"
+	WZ_CXXFLAGS="${WZ_CXXFLAGS} -O2 -g ${WZ_WARNINGS_GCC_CXX}"
 	WZ_C99FLAGS="${WZ_C99FLAGS} -Wno-declaration-after-statement"
 	WZ_CPPFLAGS="${WZ_CPPFLAGS} -DDEBUG"
 elif test "x$enable_debug" = "xrelaxed" ; then

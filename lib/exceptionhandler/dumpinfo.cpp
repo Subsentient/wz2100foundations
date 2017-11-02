@@ -73,6 +73,7 @@ static void dumpstr(const DumpFileHandle file, const char *const str, std::size_
 			case EAGAIN:
 				// Sleep to prevent wasting of CPU in case of non-blocking I/O
 				usleep(1);
+				break;
 			case EINTR:
 				continue;
 			default:

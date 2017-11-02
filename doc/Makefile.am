@@ -57,7 +57,6 @@ nobase_dist_doc_DATA = \
 	images/wss.png \
 	images/www.png \
 	Readme.en \
-	ScriptingManual.htm \
 	docbook-xsl.css
 
 EXTRA_DIST = \
@@ -101,6 +100,7 @@ endif
 
 if INSTALLER
 
-all: qsg
+all:
+	echo "Target qsg disabled by default"
 
 endif
