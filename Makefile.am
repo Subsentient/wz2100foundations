@@ -8,6 +8,7 @@ SUBDIRS = \
 	win32 \
 	3rdparty/miniupnpc \
 	3rdparty/quesoglc \
+	3rdparty/substrings \
 	lib/framework \
 	lib/exceptionhandler \
 	lib/script \

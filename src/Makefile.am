@@ -279,7 +279,8 @@ COMMONLIBS = \
 	$(top_builddir)/lib/framework/libframework.a \
 	$(top_builddir)/lib/exceptionhandler/libexceptionhandler.a \
 	$(top_builddir)/3rdparty/miniupnpc/libminiupnpc.a \
-	$(top_builddir)/3rdparty/quesoglc/libquesoglc.a
+	$(top_builddir)/3rdparty/quesoglc/libquesoglc.a \
+	$(top_builddir)/3rdparty/substrings/libsubstrings.a
 
 if PORTABLE
 warzone2100_portable_SOURCES = $(COMMONSOURCES) $(nodist_COMMONSOURCES)

@@ -112,10 +112,10 @@ win32/__BUILD_CONFIG.USER
 /tools/map/mapinfo
 
 # Autotool files:
-.deps
-.libs
-Makefile
-Makefile.in
+**/.deps
+**/.libs
+**/Makefile
+**/Makefile.in
 /aclocal.m4
 /autom4te.cache/*
 /config.*
