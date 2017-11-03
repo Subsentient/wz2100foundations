@@ -103,7 +103,6 @@ public:
 	{
 		if (!this->Lines.count(String)) this->Lines[String] = std::to_string(DefaultValue);
 	
-		printf("Integer value for key %s as string \"%s\"\n", String, this->Lines.at(String).c_str());
 		return ValueObject { this->Lines.at(String).c_str() };
 	}
 	
@@ -111,8 +110,6 @@ public:
 	{
 		if (!this->Lines.count(String)) this->Lines[String] = DefaultValue;
 		
-		printf("Text value for key %s as string \"%s\"\n", String, this->Lines.at(String).c_str());
-
 		return ValueObject { this->Lines.at(String).c_str() };
 	}
 	ValueObject value(const char *String) const
