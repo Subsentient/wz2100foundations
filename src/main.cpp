@@ -485,29 +485,8 @@ static void initialize_ConfigDir(void)
 	if (strlen(configdir) == 0)
 	{
 		getPlatformUserDir(tmpstr, sizeof(tmpstr));
-		sstrcpy(writepath, tmpstr);		// save copy of original write directory
-		if (!PHYSFS_setWriteDir(tmpstr)) // We point to our write directory (must be platform-dependent notation!)
-		{
-			debug(LOG_FATAL, "Error setting write directory to \"%s\": %s", tmpstr, PHYSFS_getLastError());
-			exit(1);
-		}
-
-		// Creating specific directory in relation to the actual version of the game.
-		// It will be of the format of Major version/minor version
-		// For example  Warzone 2100 3.1/3.1.3
-		// NOTE: must be in platform-independent notation!
-		sstrcpy(tmpstr, WZ_WRITEDIR);
-		sstrcat(tmpstr, "/");
-		sstrcat(tmpstr, WZ_GAME_VERSION);
-		if (!PHYSFS_mkdir(tmpstr))
-		{
-			debug(LOG_FATAL, "Error creating directory \"%s\": %s", tmpstr, PHYSFS_getLastError());
-			exit(1);
-		}
-		// Redo our write directory, NOTE: must be platform-dependent notation!
+		sstrcpy(writepath, tmpstr);
 		sstrcat(writepath, WZ_WRITEDIR);
-		sstrcat(writepath, PHYSFS_getDirSeparator());
-		sstrcat(writepath, WZ_GAME_VERSION);
 		sstrcat(writepath, PHYSFS_getDirSeparator());
 		if (!PHYSFS_setWriteDir(writepath))
 		{
