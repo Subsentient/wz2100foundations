@@ -23,7 +23,6 @@
  *
  */
 
-#include <QtCore/QSettings>
 #include "lib/framework/wzapp.h"
 #include "lib/framework/wzconfig.h"
 #include "lib/framework/input.h"
@@ -46,6 +45,10 @@
 #include "texture.h"
 #include "warzoneconfig.h"	// renderMode
 
+#include "substrings.h"
+
+#include <sys/stat.h>
+
 // ////////////////////////////////////////////////////////////////////////////
 
 #define DEFAULTSCROLL	1000
@@ -54,16 +57,174 @@
 
 static const char *fileName = "config";
 
+class IniReader
+{
+public:
+	enum Status { STATUS_NOERROR, STATUS_ERROR };
+	
+	struct ValueObject
+	{
+		const char *String;
+
+		bool toBool(void) const
+		{
+			if (!this->String) return false;
+			
+			if (SubStrings.CaseCompare("true", this->String)) return true;
+			else if (SubStrings.CaseCompare("false", this->String)) return false;
+
+			return std::stoi(String);
+			
+		}
+		
+		operator const char *(void) const { return this->String; }
+		
+		int64_t toInt(void) const { return this->String ? atoll(this->String) : 0; }
+		long double toDouble(void) const { return this->String ? strtold(this->String, nullptr) : 0.0l; }
+	};
+private:
+	std::map<std::string, std::string> Lines;
+	std::string FileName;
+	Status OpenStatus;
+public:
+	IniReader(const std::string &FilePath);
+	Status status(void) const { return this->OpenStatus; }
+	bool contains(const char *String) const { return this->Lines.count(String); }
+	bool contains(const std::string &String) const { return this->Lines.count(String); }
+	
+	
+	ValueObject value(const char *String, const bool DefaultValue)
+	{
+		if (!this->Lines.count(String)) this->Lines[String] = DefaultValue ? "true" : "false";
+
+		return ValueObject { this->Lines.at(String).c_str() };
+	}
+	ValueObject value(const char *String, const int DefaultValue)
+	{
+		if (!this->Lines.count(String)) this->Lines[String] = std::to_string(DefaultValue);
+	
+		printf("Integer value for key %s as string \"%s\"\n", String, this->Lines.at(String).c_str());
+		return ValueObject { this->Lines.at(String).c_str() };
+	}
+	
+	ValueObject value(const char *String, const char *DefaultValue)
+	{
+		if (!this->Lines.count(String)) this->Lines[String] = DefaultValue;
+		
+		printf("Text value for key %s as string \"%s\"\n", String, this->Lines.at(String).c_str());
+
+		return ValueObject { this->Lines.at(String).c_str() };
+	}
+	ValueObject value(const char *String) const
+	{
+		if (!this->Lines.count(String)) return ValueObject();
+		
+		ValueObject RetVal = { this->Lines.at(String).c_str() };
+		
+		return RetVal;
+	}
+	ValueObject value(const std::string &String) const { return this->value(String.c_str()); }
+	
+	const char *fileName(void) const { return this->FileName.c_str(); }
+	
+	void setValue(const char *Key, const char *String) { this->Lines[Key] = String; }
+	void setValue(const char *Key, const short Integer) { this->Lines[Key] = std::to_string(Integer); }
+	void setValue(const char *Key, const unsigned short Integer) { this->Lines[Key] = std::to_string(Integer); }
+	void setValue(const char *Key, const int Integer) { this->Lines[Key] = std::to_string(Integer); }
+	void setValue(const char *Key, const unsigned Integer) { this->Lines[Key] = std::to_string(Integer); }
+	void setValue(const char *Key, const long Integer) { this->Lines[Key] = std::to_string(Integer); }
+	void setValue(const char *Key, const unsigned long Integer) { this->Lines[Key] = std::to_string(Integer); }
+	void setValue(const char *Key, const long long Integer) { this->Lines[Key] = std::to_string(Integer); }
+	void setValue(const char *Key, const unsigned long long Integer) { this->Lines[Key] = std::to_string(Integer); }
+	void setValue(const char *Key, const long double Floaty) { this->Lines[Key] = std::to_string(Floaty); }
+	void setValue(const char *Key, const bool Value) { this->Lines[Key] = Value ? "true" : "false"; }
+	bool sync(void) const;
+};
+
+
+IniReader::IniReader(const std::string &FilePath_) : FileName(FilePath_), OpenStatus()
+{
+	const char *FilePath = FilePath_.c_str();
+	
+	struct stat FileStat{};
+	
+	if (stat(FilePath, &FileStat) != 0)
+	{
+		this->OpenStatus = STATUS_ERROR;
+		return;
+	}
+	
+	FILE *Desc = fopen(FilePath, "rb");
+	
+	if (!Desc)
+	{
+		this->OpenStatus = STATUS_ERROR;
+		return;
+	}
+	
+	char *Buf = new char[FileStat.st_size + 1]();
+	
+	fread(Buf, 1, FileStat.st_size, Desc);
+	fclose(Desc);
+	
+	const char *Ptr = Buf;
+	
+	char LineBuf[2048];
+	
+	while (SubStrings.Line.GetLine(LineBuf, sizeof LineBuf, &Ptr))
+	{
+		SubStrings.StripLeadingChars(LineBuf, " \t");
+		
+		if (!*LineBuf || *LineBuf == '[' || *LineBuf == '#') continue;
+		
+		if (!strchr(LineBuf, '='))
+		{
+			debug(LOG_WARNING, "Bad data in config file");
+			continue;
+		}
+		
+		char Key[sizeof LineBuf];
+		char Value[sizeof LineBuf];
+		
+		SubStrings.Split(Key, Value, "=", LineBuf, SPLIT_NOKEEP);
+		
+		//Get rid of any whitespace that shouldn't be there.
+		SubStrings.StripTrailingChars(Key, " \t");
+		SubStrings.StripLeadingChars(Value, " \t");
+		SubStrings.StripTrailingChars(Value, " \t");
+		
+		this->Lines[Key] = Value;
+	}
+	
+	delete[] Buf;
+}
+
+bool IniReader::sync(void) const
+{
+	FILE *Desc = fopen(this->FileName.c_str(), "w"); //NOT "wb", cuz we want it to do the newline conversions on Windows.
+	
+	if (!Desc) return false;
+	
+	for (auto Iter = this->Lines.begin(); Iter != this->Lines.end(); ++Iter)
+	{
+		const std::string Line = std::string(Iter->first) + "=" + Iter->second + "\n";
+		fwrite(Line.c_str(), 1, Line.length(), Desc);
+	}
+	
+	fclose(Desc);
+	return true;
+}
+
+
 // ////////////////////////////////////////////////////////////////////////////
 bool loadConfig()
 {
-	QSettings ini(PHYSFS_getWriteDir() + QString("/") + fileName, QSettings::IniFormat);
-	if (ini.status() != QSettings::NoError)
+	IniReader ini(std::string(PHYSFS_getWriteDir()) + PHYSFS_getDirSeparator() + fileName);
+	if (ini.status() != IniReader::STATUS_NOERROR)
 	{
-		debug(LOG_ERROR, "Could not open configuration file \"%s\"", fileName);
-		return false;
+		debug(LOG_WARNING, "Could not open configuration file \"%s\"", fileName);
 	}
-	debug(LOG_WZ, "Reading configuration from %s", ini.fileName().toUtf8().constData());
+	debug(LOG_WZ, "Reading configuration from %s", ini.fileName());
 	if (ini.contains("voicevol"))
 	{
 		sound_SetUIVolume(ini.value("voicevol").toDouble() / 100.0);
@@ -82,7 +243,7 @@ bool loadConfig()
 	}
 	if (ini.contains("language"))
 	{
-		setLanguage(ini.value("language").toString().toUtf8().constData());
+		setLanguage(ini.value("language"));
 	}
 	if (ini.contains("nomousewarp"))
 	{
@@ -94,7 +255,7 @@ bool loadConfig()
 	}
 	showFPS = ini.value("showFPS", false).toBool();
 	scroll_speed_accel = ini.value("scroll", DEFAULTSCROLL).toInt();
-	setShakeStatus(ini.value("shake", true).toBool());
+	setShakeStatus(ini.value("shake", false).toBool());
 	setDrawShadows(ini.value("shadows", true).toBool());
 	war_setSoundEnabled(ini.value("sound", true).toBool());
 	setInvertMouseStatus(ini.value("mouseflip", true).toBool());
@@ -102,10 +263,10 @@ bool loadConfig()
 	setMiddleClickRotate(ini.value("MiddleClickRotate", false).toBool());
 	rotateRadar = ini.value("rotateRadar", true).toBool();
 	war_SetPauseOnFocusLoss(ini.value("PauseOnFocusLoss", false).toBool());
-	NETsetMasterserverName(ini.value("masterserver_name", "lobby.wz2100.net").toString().toUtf8().constData());
-	iV_font(ini.value("fontname", "DejaVu Sans").toString().toUtf8().constData(),
-	        ini.value("fontface", "Book").toString().toUtf8().constData(),
-	        ini.value("fontfacebold", "Bold").toString().toUtf8().constData());
+	NETsetMasterserverName(ini.value("masterserver_name", "lobby.wz2100.net"));
+	iV_font(ini.value("fontname", "DejaVu Sans"),
+	        ini.value("fontface", "Book"),
+	        ini.value("fontfacebold", "Bold"));
 	NETsetMasterserverPort(ini.value("masterserver_port", MASTERSERVERPORT).toInt());
 	NETsetGameserverPort(ini.value("gameserver_port", GAMESERVERPORT).toInt());
 	war_SetFMVmode((FMV_MODE)ini.value("FMVmode", FMV_FULLSCREEN).toInt());
@@ -114,8 +275,8 @@ bool loadConfig()
 	setDifficultyLevel((DIFFICULTY_LEVEL)ini.value("difficulty", DL_NORMAL).toInt());
 	war_SetSPcolor(ini.value("colour", 0).toInt());	// default is green (0)
 	war_setMPcolour(ini.value("colourMP", -1).toInt());  // default is random (-1)
-	sstrcpy(game.name, ini.value("gameName", _("My Game")).toString().toUtf8().constData());
-	sstrcpy(sPlayer, ini.value("playerName", _("Player")).toString().toUtf8().constData());
+	sstrcpy(game.name, ini.value("gameName", _("My Game")));
+	sstrcpy(sPlayer, ini.value("playerName", _("Player")));
 
 	// Set a default map to prevent hosting games without a map.
 	sstrcpy(game.map, "Sk-Rush");
@@ -128,10 +289,11 @@ bool loadConfig()
 	memset(&ingame.phrases, 0, sizeof(ingame.phrases));
 	for (int i = 1; i < 5; i++)
 	{
-		QString key("phrase" + QString::number(i));
-		if (ini.contains(key))
+		std::string Key = std::string("phrase") + std::to_string(i);
+		
+		if (ini.contains(Key))
 		{
-			sstrcpy(ingame.phrases[i], ini.value(key).toString().toUtf8().constData());
+			sstrcpy(ingame.phrases[i], ini.value(Key));
 		}
 	}
 	bEnemyAllyRadarColor = ini.value("radarObjectMode").toBool();
@@ -182,13 +344,13 @@ bool loadConfig()
 // ////////////////////////////////////////////////////////////////////////////
 bool saveConfig()
 {
-	QSettings ini(PHYSFS_getWriteDir() + QString("/") + fileName, QSettings::IniFormat);
-	if (ini.status() != QSettings::NoError)
+	IniReader ini(std::string(PHYSFS_getWriteDir()) + PHYSFS_getDirSeparator() + fileName);
+
+	if (ini.status() != IniReader::STATUS_NOERROR)
 	{
-		debug(LOG_ERROR, "Could not open configuration file \"%s\"", fileName);
-		return false;
+		debug(LOG_WARNING, "Could not open configuration file \"%s\"", fileName);
 	}
-	debug(LOG_WZ, "Writing prefs to registry \"%s\"", ini.fileName().toUtf8().constData());
+	debug(LOG_WZ, "Writing prefs to registry \"%s\"", ini.fileName());
 
 	// //////////////////////////
 	// voicevol, fxvol and cdvol
@@ -199,7 +361,11 @@ bool saveConfig()
 	ini.setValue("width", war_GetWidth());
 	ini.setValue("height", war_GetHeight());
 	ini.setValue("bpp", pie_GetVideoBufferDepth());
-	ini.setValue("fullscreen", war_getFullscreen());
+
+	const bool FSValue = war_getFullscreen();
+	printf("Fullscreen value at saveConfig() is %s\n", FSValue ? "true" : "false");
+	
+	ini.setValue("fullscreen", FSValue);
 	ini.setValue("language", getLanguage());
 	// dont save out the cheat mode.
 	if (getDifficultyLevel() != DL_KILLER && getDifficultyLevel() != DL_TOUGH)
@@ -262,8 +428,9 @@ bool saveConfig()
 // Ensures that others' games don't change our own configuration settings
 bool reloadMPConfig(void)
 {
-	QSettings ini(PHYSFS_getWriteDir() + QString("/") + fileName, QSettings::IniFormat);
-	if (ini.status() != QSettings::NoError)
+	IniReader ini(std::string(PHYSFS_getWriteDir()) + PHYSFS_getDirSeparator() + fileName);
+
+	if (ini.status() != IniReader::STATUS_NOERROR)
 	{
 		debug(LOG_ERROR, "Could not open configuration file \"%s\"", fileName);
 		return false;
@@ -279,7 +446,7 @@ bool reloadMPConfig(void)
 			// reset the name
 			if (ini.contains("gameName"))
 			{
-				sstrcpy(game.name, ini.value("gameName").toString().toUtf8().constData());
+				sstrcpy(game.name, ini.value("gameName"));
 			}
 		}
 		return true;
@@ -298,7 +465,7 @@ bool reloadMPConfig(void)
 			// reset the name
 			if (ini.contains("gameName"))
 			{
-				sstrcpy(game.name, ini.value("gameName").toString().toUtf8().constData());
+				sstrcpy(game.name, ini.value("gameName"));
 			}
 		}
 
@@ -318,7 +485,7 @@ bool reloadMPConfig(void)
 	// game name
 	if (ini.contains("gameName"))
 	{
-		sstrcpy(game.name, ini.value("gameName").toString().toUtf8().constData());
+		sstrcpy(game.name, ini.value("gameName"));
 	}
 
 	// Set a default map to prevent hosting games without a map.
